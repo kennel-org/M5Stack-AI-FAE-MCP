@@ -19,8 +19,17 @@ M5Stack_AI_FAE_MCP/
 │   ├── m5ai_mcp.md         # このファイル
 │   └── requirements_ja.md  # 要件仕様
 ├── test/                   # テストコード
-│   ├── m5ai.test.js        # Playwright Test Framework用スクリプト
-│   └── logs/               # ログファイル保存ディレクトリ
+│   ├── fixtures/           # テスト用の共通フィクスチャ
+│   │   └── m5ai-fixture.js # 日本語ブラウザ設定などの共通フィクスチャ
+│   ├── logs/               # テスト実行時のログファイル保存先
+│   ├── reports/            # テストレポート出力先
+│   │   ├── html-report/    # HTML形式のレポート
+│   │   └── test-results/   # テスト結果（スクリーンショットなど）
+│   ├── specs/              # テスト仕様ファイル
+│   │   └── m5ai.spec.js    # M5 AI FAEとの対話テスト
+│   └── utils/              # 共通ユーティリティ
+│       ├── logger.js       # ログ関連のユーティリティ
+│       └── m5ai-helper.js  # M5 AI FAE対話用ヘルパー関数
 ├── package.json            # プロジェクト設定
 ├── playwright.config.js    # Playwright設定
 └── README.md               # 概要ファイル
@@ -45,8 +54,24 @@ M5Stack_AI_FAE_MCP/
 
 ### 実行方法
 
+通常のテスト実行（ブラウザ表示あり）:
 ```bash
 npm test
+```
+
+ブラウザを表示してテスト実行（明示的に指定）:
+```bash
+npm run test:headed
+```
+
+デバッグモードでテスト実行:
+```bash
+npm run test:debug
+```
+
+テストレポートを表示:
+```bash
+npm run report
 ```
 
 ## Playwrightを使用したM5 AIとの対話手順

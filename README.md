@@ -10,8 +10,17 @@ M5Stack_AI_FAE_MCP/
 │   ├── m5ai_mcp.md         # Detailed guide for M5 AI automation
 │   └── requirements_ja.md  # Requirements specification
 ├── test/                   # Test code
-│   ├── m5ai.test.js        # Playwright Test Framework script
-│   └── logs/               # Log files directory
+│   ├── fixtures/           # Test fixtures
+│   │   └── m5ai-fixture.js # Japanese browser settings and fixtures
+│   ├── logs/               # Log storage
+│   ├── reports/            # Test reports
+│   │   ├── html-report/    # HTML format reports
+│   │   └── test-results/   # Test results (screenshots, etc.)
+│   ├── specs/              # Test specifications
+│   │   └── m5ai.spec.js    # M5 AI FAE interaction test
+│   └── utils/              # Utility functions
+│       ├── logger.js       # Logging utilities
+│       └── m5ai-helper.js  # M5 AI FAE interaction helpers
 ├── package.json            # Project configuration
 ├── playwright.config.js    # Playwright configuration
 └── README.md               # This file
