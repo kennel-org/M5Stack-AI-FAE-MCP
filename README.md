@@ -66,14 +66,6 @@ All output files are saved to the `test/logs` directory with timestamps to preve
 - Response HTML (HTML)
 - Bot messages (JSON)
 
-## Hardware Information
-
-This project is designed to work with M5Stack hardware, specifically:
-- AtomS3 Lite with GPS module connection
-- AtomicBase GPS with the following pin configuration:
-  - GPS_TX_PIN = 5
-  - GPS_RX_PIN = -1
-
 ## License
 
 This project is proprietary and confidential.
