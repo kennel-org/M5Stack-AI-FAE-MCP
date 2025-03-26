@@ -1,0 +1,36 @@
+{
+  "name": "m5stack-ai-fae-mcp",
+  "version": "1.0.0",
+  "description": "M5 AI FAE automation tool using Playwright",
+  "main": "test/specs/m5ai.spec.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "report": "npx playwright show-report test/reports/html-report",
+    "clean": "rimraf test/logs/* test/reports/*",
+    "playwright:install": "npx playwright install chromium",
+    "playwright:install-deps": "npx playwright install-deps chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.51.1",
+    "rimraf": "^5.0.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.1",
+    "@types/node": "^22.13.13"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "m5stack",
+    "playwright",
+    "automation",
+    "testing",
+    "ai",
+    "fae"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}
