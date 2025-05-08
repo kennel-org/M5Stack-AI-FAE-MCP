@@ -54,10 +54,49 @@ M5Stack_AI_FAE_MCP/
 
 ### 実行方法
 
-通常のテスト実行（ブラウザ表示あり）:
+#### 1. Playwrightテストとして実行（従来通り）
 ```bash
 npm test
 ```
+
+#### 2. MCPサーバ（APIサーバ）として利用
+
+`mcp-server.js` を起動することで、外部からHTTP経由でm5stack chatbotに質問し、AI回答を取得できます。
+
+**サーバ起動（ローカル）:**
+```bash
+node mcp-server.js
+```
+
+**サーバ起動（Docker）:**
+```bash
+docker build -t m5ai-mcp .
+docker run -p 3000:3000 m5ai-mcp
+```
+
+**APIエンドポイント:**
+- `POST /ask`  
+  リクエストボディ：`{ "question": "質問内容" }`
+  
+  レスポンス例：
+  ```json
+  {
+    "question": "AtomS3 LiteにGPSモジュールを接続する方法を教えてください",
+    "answer": "（AIの回答テキスト）",
+    "html": "（回答HTML）"
+  }
+  ```
+
+**curl例:**
+```bash
+curl -X POST http://localhost:3000/ask -H "Content-Type: application/json" -d '{"question": "AtomS3 LiteにGPSモジュールを接続する方法を教えてください"}'
+```
+
+#### APIサーバの仕組み
+- ExpressベースのサーバがHTTPリクエストを受け付け
+- Playwrightでm5stack chatbotに実際にアクセス・質問を送信
+- 回答が完全に表示されるまで「考え中...」インジケータを監視し、AI回答を取得
+- 結果をJSONで返却
 
 ブラウザを表示してテスト実行（明示的に指定）:
 ```bash
