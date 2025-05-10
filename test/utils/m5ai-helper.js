@@ -1,19 +1,25 @@
 /**
- * M5 AI FAEとの対話を支援するユーティリティ関数
+ * Utility functions to support interaction with M5 AI FAE
  */
 const { saveTextFile, saveHtmlFile, saveJsonFile } = require('./logger');
 
 /**
- * 回答テキストを取得する関数
- * @param {import('@playwright/test').Page} page Playwrightのページオブジェクト
- * @returns {Promise<{text: string, html: string}>} 取得したテキストとHTML
+ * Function to retrieve response text
+ * @param {import('@playwright/test').Page} page Playwright page object
+ * @returns {Promise<{text: string, html: string, selectorUsed: string, originalText: string}>} Retrieved text and HTML
  */
 async function getLatestAIResponse(page) {
-  // 試行するセレクタのリスト
+  // List of selectors to try - in priority order (prioritizing selectors verified effective in debugging)
   const responseSelectors = [
+    // Selectors with verified effectiveness
     '.message.bot-message:last-child .message-text',
     '.message.bot-message:nth-last-child(1) .message-text',
+    '.bot-message:last-child',
+    // Other selectors (kept for reference)
     '.message.bot-message:nth-last-child(2) .message-text',
+    '.chat-message-bot:last-child .chat-message-content',
+    '.chat-message-bot:last-child',
+    '.ai-message:last-child',
     '.message.bot-message .message-text',
     '.message-text',
     '.message',
@@ -28,48 +34,151 @@ async function getLatestAIResponse(page) {
     '.message-list .message:nth-last-child(2)'
   ];
   
-  // すべてのセレクタを試行
+  // Try all selectors
   for (const selector of responseSelectors) {
     try {
+      // Check if selector exists
+      const exists = await page.$(selector);
+      if (!exists) {
+        console.log(`Selector "${selector}" does not exist`);
+        continue;
+      }
+      
+      // Get text content
       const text = await page.textContent(selector);
-      if (text && text.trim() !== '' && text.length > 100) { // 長さが100文字以上の場合のみ有効な回答と見なす
-        console.log(`セレクタ "${selector}" で回答テキストを取得しました`);
+      if (text && text.trim() !== '' && text.length > 50) { // Consider as valid response only if length is more than 50 characters
+        console.log(`Retrieved response text with selector "${selector}" (${text.length} characters)`);
         
-        // HTMLコンテンツも取得
+        // Get HTML content as well
         const html = await page.evaluate(sel => {
           const element = document.querySelector(sel);
           return element ? element.innerHTML : '';
         }, selector);
-        console.log(`セレクタ "${selector}" で回答HTMLを取得しました`);
+        console.log(`Retrieved response HTML with selector "${selector}"`);
         
-        return { text: text.trim(), html };
+        // Remove "Thinking..." lines
+        const cleanedText = text.trim()
+          .split('\n')
+          .filter(line => !line.trim().startsWith('考え中...'))
+          .join('\n')
+          .trim();
+        
+        return { 
+          text: cleanedText, 
+          html, 
+          selectorUsed: selector,
+          originalText: text.trim()
+        };
+      } else if (text) {
+        console.log(`Text from selector "${selector}" is too short (${text.length} characters): ${text.substring(0, 30)}...`);
       }
     } catch (error) {
-      console.log(`セレクタ "${selector}" での取得に失敗しました`);
+      console.log(`Failed to retrieve with selector "${selector}": ${error.message}`);
     }
   }
   
-  // 最終手段：ボットメッセージの詳細情報を取得
+  // Last resort: Get detailed information about bot messages
   try {
+    console.log('Failed to find with selectors, trying direct JavaScript exploration');
     const botMessages = await page.evaluate(() => {
-      const messages = Array.from(document.querySelectorAll('.message.bot-message'));
-      return messages.map(msg => {
-        const id = msg.id;
-        const text = msg.querySelector('.message-text')?.textContent || '';
-        const html = msg.querySelector('.message-text')?.innerHTML || '';
-        return { id, text, html };
+      // Try multiple possible selector patterns
+      const possibleSelectors = [
+        '.message.bot-message',
+        '.chat-message-bot',
+        '.bot-message',
+        '.ai-message',
+        '.message[data-role="assistant"]',
+        '.message[data-sender="bot"]'
+      ];
+      
+      let messages = [];
+      
+      // Try each selector pattern
+      for (const selector of possibleSelectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements && elements.length > 0) {
+          console.log(`Found ${elements.length} messages with ${selector}`);
+          messages = Array.from(elements);
+          break;
+        }
+      }
+      
+      // メッセージが見つからなかった場合は、より汎用的な方法で探す
+      if (messages.length === 0) {
+        console.log('汎用的な方法でメッセージを探索します');
+        // すべてのdiv要素をチェックして、大きなテキストブロックを探す
+        const allDivs = document.querySelectorAll('div');
+        const potentialMessages = Array.from(allDivs).filter(div => {
+          const text = div.textContent || '';
+          return text.length > 100 && !div.querySelector('input, textarea, button');
+        });
+        
+        if (potentialMessages.length > 0) {
+          console.log(`${potentialMessages.length} 個の潜在的なメッセージを発見`);
+          messages = potentialMessages;
+        }
+      }
+      
+      // メッセージをマップしてテキストとHTMLを取得
+      const mappedMessages = messages.map(msg => {
+        const id = msg.id || '';
+        // テキストコンテンツを取得する複数の方法を試す
+        let text = '';
+        let html = '';
+        
+        // 特定のクラスを持つ子要素を探す
+        const textElement = msg.querySelector('.message-text') || 
+                           msg.querySelector('.chat-message-content') || 
+                           msg.querySelector('.content');
+        
+        if (textElement) {
+          text = textElement.textContent || '';
+          html = textElement.innerHTML || '';
+        } else {
+          // 子要素がない場合は要素自体のテキストを使用
+          text = msg.textContent || '';
+          html = msg.innerHTML || '';
+        }
+        
+        return { id, text: text.trim(), html };
       });
+      
+      // 短すぎるメッセージをフィルタリング
+      const filteredMessages = mappedMessages.filter(msg => msg.text.length > 50);
+      console.log(`${mappedMessages.length} 個のメッセージから ${filteredMessages.length} 個の有効なメッセージをフィルタリングしました`);
+      
+      return filteredMessages.length > 0 ? filteredMessages : mappedMessages;
     });
     
     if (botMessages.length > 0) {
-      const lastMessage = botMessages[botMessages.length - 1];
-      return { text: lastMessage.text, html: lastMessage.html };
+      // 最も長いメッセージを選択（より完全な回答である可能性が高い）
+      botMessages.sort((a, b) => b.text.length - a.text.length);
+      const bestMessage = botMessages[0];
+      console.log(`JavaScriptによる探索で ${botMessages.length} 個のメッセージを発見、最長の ${bestMessage.text.length} 文字のメッセージを選択`);
+      
+      // 「考え中...」の行を削除
+      const cleanedText = bestMessage.text
+        .split('\n')
+        .filter(line => !line.trim().startsWith('考え中...'))
+        .join('\n')
+        .trim();
+      
+      return { 
+        text: cleanedText, 
+        html: bestMessage.html, 
+        selectorUsed: 'javascript-exploration',
+        originalText: bestMessage.text
+      };
+    } else {
+      console.log('JavaScriptによる探索でもメッセージを発見できませんでした');
     }
   } catch (error) {
     console.error('ボットメッセージの取得中にエラーが発生しました:', error);
   }
   
-  return { text: '', html: '' };
+  // すべての方法が失敗した場合は空の結果を返す
+  console.log('すべての方法が失敗しました。空の結果を返します。');
+  return { text: '', html: '', selectorUsed: 'none', originalText: '' };
 }
 
 /**
@@ -142,18 +251,84 @@ async function clickSuggestedQuestion(page, questionIndex = 0, timestamp) {
 /**
  * ボットメッセージの詳細情報を取得する関数
  * @param {import('@playwright/test').Page} page Playwrightのページオブジェクト
- * @returns {Promise<Array<{id: string, text: string, html: string}>>} ボットメッセージの配列
+ * @returns {Promise<Array<{id: string, text: string, html: string, originalText: string}>>} ボットメッセージの配列
  */
 async function getBotMessages(page) {
   try {
     return await page.evaluate(() => {
-      const messages = Array.from(document.querySelectorAll('.message.bot-message'));
-      return messages.map(msg => {
-        const id = msg.id;
-        const text = msg.querySelector('.message-text')?.textContent || '';
-        const html = msg.querySelector('.message-text')?.innerHTML || '';
-        return { id, text, html };
+      // 複数の可能性のあるセレクタパターンを試す
+      const possibleSelectors = [
+        '.message.bot-message',
+        '.chat-message-bot',
+        '.bot-message',
+        '.ai-message',
+        '.message[data-role="assistant"]',
+        '.message[data-sender="bot"]'
+      ];
+      
+      let messages = [];
+      
+      // 各セレクタパターンを試す
+      for (const selector of possibleSelectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements && elements.length > 0) {
+          console.log(`${selector} で ${elements.length} 個のメッセージを発見`);
+          messages = Array.from(elements);
+          break;
+        }
+      }
+      
+      // メッセージが見つからなかった場合は、より汎用的な方法で探す
+      if (messages.length === 0) {
+        console.log('汎用的な方法でメッセージを探索します');
+        // すべてのdiv要素をチェックして、大きなテキストブロックを探す
+        const allDivs = document.querySelectorAll('div');
+        const potentialMessages = Array.from(allDivs).filter(div => {
+          const text = div.textContent || '';
+          return text.length > 100 && !div.querySelector('input, textarea, button');
+        });
+        
+        if (potentialMessages.length > 0) {
+          console.log(`${potentialMessages.length} 個の潜在的なメッセージを発見`);
+          messages = potentialMessages;
+        }
+      }
+      
+      // メッセージをマップしてテキストとHTMLを取得
+      const mappedMessages = messages.map(msg => {
+        const id = msg.id || '';
+        // テキストコンテンツを取得する複数の方法を試す
+        let text = '';
+        let html = '';
+        
+        // 特定のクラスを持つ子要素を探す
+        const textElement = msg.querySelector('.message-text') || 
+                           msg.querySelector('.chat-message-content') || 
+                           msg.querySelector('.content');
+        
+        if (textElement) {
+          text = textElement.textContent || '';
+          html = textElement.innerHTML || '';
+        } else {
+          // 子要素がない場合は要素自体のテキストを使用
+          text = msg.textContent || '';
+          html = msg.innerHTML || '';
+        }
+        
+        // 「考え中...」の行を削除
+        const cleanedText = text.trim()
+          .split('\n')
+          .filter(line => !line.trim().startsWith('考え中...'))
+          .join('\n')
+          .trim();
+        
+        return { id, text: cleanedText, html, originalText: text.trim() };
       });
+      
+      // 短すぎるメッセージをフィルタリング
+      const filteredMessages = mappedMessages.filter(msg => msg.text.length > 50);
+      
+      return filteredMessages.length > 0 ? filteredMessages : mappedMessages;
     });
   } catch (error) {
     console.error('ボットメッセージの取得中にエラーが発生しました:', error);

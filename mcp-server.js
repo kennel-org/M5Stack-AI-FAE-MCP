@@ -2,9 +2,27 @@
 const express = require('express');
 const { chromium } = require('playwright');
 const { getLatestAIResponse } = require('./test/utils/m5ai-helper');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname)));
+
+// Enable CORS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Default route to serve debug.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'debug.html'));
+});
 
 // POST /ask { question: "..." }
 app.post('/ask', async (req, res) => {
@@ -70,7 +88,13 @@ app.post('/ask', async (req, res) => {
     res.json({
       question,
       answer: response?.text || '',
-      html: response?.html || ''
+      html: response?.html || '',
+      originalAnswer: response?.originalText || '',
+      selectors: {
+        tested: true,
+        successful: response?.text ? true : false,
+        selectorUsed: response?.selectorUsed || 'unknown'
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
