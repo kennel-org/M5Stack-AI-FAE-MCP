@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M5 AI FAE Debug Interface</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: inherit;
+        }
+        button {
+            background-color: #0078d7;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .response-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            min-height: 100px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            margin-top: 10px;
+            color: #666;
+            font-style: italic;
+        }
+        .debug-info {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        .debug-info pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #0078d7;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: #f9f9f9;
+            border-color: #ddd;
+            border-bottom-color: #f9f9f9;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .selector-test-results {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .selector-item {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .selector-success {
+            background-color: #e6ffe6;
+            border-left: 3px solid #4CAF50;
+        }
+        .selector-failure {
+            background-color: #fff0f0;
+            border-left: 3px solid #f44336;
+        }
+        .html-preview {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>M5 AI FAE Debug Interface</h1>
+    
+    <div class="container">
+        <h2>Ask a Question</h2>
+        <textarea id="question" placeholder="Type your question here...">AtomS3 LiteにGPSモジュールを接続する方法を教えてください</textarea>
+        <div>
+            <button id="submit-btn">Send Question</button>
+            <button id="test-selectors-btn">Test Selectors Only</button>
+            <span id="loading-indicator" class="loading" style="display: none;"></span>
+        </div>
+        <p class="status" id="status">Ready to send questions.</p>
+    </div>
+    
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" data-tab="response-tab">Response</div>
+            <div class="tab" data-tab="html-tab">HTML Response</div>
+            <div class="tab" data-tab="debug-tab">Debug Info</div>
+            <div class="tab" data-tab="selectors-tab">Selector Tests</div>
+        </div>
+        
+        <div class="tab-content active" id="response-tab">
+            <div class="response-container" id="response">
+                <p>Response will appear here...</p>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="html-tab">
+            <h3>HTML Response</h3>
+            <pre id="html-response">No HTML response available yet.</pre>
+            <h3>HTML Preview</h3>
+            <div class="html-preview" id="html-preview">HTML preview will appear here...</div>
+        </div>
+        
+        <div class="tab-content" id="debug-tab">
+            <h3>Debug Information</h3>
+            <pre id="debug-info">No debug information available yet.</pre>
+        </div>
+        
+        <div class="tab-content" id="selectors-tab">
+            <h3>Selector Test Results</h3>
+            <div class="selector-test-results" id="selector-results">
+                No selector tests run yet.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const questionInput = document.getElementById('question');
+            const submitBtn = document.getElementById('submit-btn');
+            const testSelectorsBtn = document.getElementById('test-selectors-btn');
+            const responseContainer = document.getElementById('response');
+            const statusElement = document.getElementById('status');
+            const debugInfo = document.getElementById('debug-info');
+            const htmlResponse = document.getElementById('html-response');
+            const htmlPreview = document.getElementById('html-preview');
+            const selectorResults = document.getElementById('selector-results');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            // Tab switching functionality
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // M5 AI FAE selectors to test
+            const responseSelectors = [
+                // M5 AI FAEの最新のUIに対応するセレクタ
+                '.message.bot-message:last-child .message-text',
+                '.message.bot-message:nth-last-child(1) .message-text',
+                '.message.bot-message:nth-last-child(2) .message-text',
+                // 一般的なチャットボットUIのセレクタ
+                '.chat-message-bot:last-child .chat-message-content',
+                '.chat-message-bot:last-child',
+                '.bot-message:last-child',
+                '.ai-message:last-child',
+                // 汎用的なセレクタ
+                '.message.bot-message .message-text',
+                '.message-text',
+                '.message',
+                '.chat-message',
+                '.chat-message-content',
+                '.response',
+                '.ai-response',
+                '.chat-response',
+                'div[role="presentation"]',
+                '.message-list .message:last-child',
+                '.message-list .message:nth-last-child(1)',
+                '.message-list .message:nth-last-child(2)'
+            ];
+            
+            // Send question to M5 AI FAE
+            submitBtn.addEventListener('click', async function() {
+                const question = questionInput.value.trim();
+                if (!question) {
+                    statusElement.textContent = 'Please enter a question.';
+                    return;
+                }
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                testSelectorsBtn.disabled = true;
+                loadingIndicator.style.display = 'inline-block';
+                statusElement.textContent = 'Sending question to M5 AI FAE...';
+                responseContainer.innerHTML = '<p>Waiting for response...</p>';
+                debugInfo.textContent = 'Sending request...';
+                
+                try {
+                    const startTime = new Date();
+                    const response = await fetch('http://localhost:3000/ask', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ question })
+                    });
+                    
+                    const endTime = new Date();
+                    const responseTime = (endTime - startTime) / 1000;
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Update UI with response
+                    responseContainer.innerHTML = data.answer ? data.answer.replace(/\n/g, '<br>') : 'No response received.';
+                    statusElement.textContent = `Response received in ${responseTime} seconds.`;
+                    
+                    // Update HTML response tab
+                    htmlResponse.textContent = data.html || 'No HTML response received.';
+                    htmlPreview.innerHTML = data.html || 'No HTML preview available.';
+                    
+                    // Test selectors on the HTML response
+                    if (data.html) {
+                        testSelectorsOnHtml(data.html);
+                    }
+                    
+                    // Update debug info
+                    debugInfo.textContent = JSON.stringify({
+                        requestTime: startTime.toISOString(),
+                        responseTime: endTime.toISOString(),
+                        durationSeconds: responseTime,
+                        questionLength: question.length,
+                        answerLength: data.answer ? data.answer.length : 0,
+                        htmlLength: data.html ? data.html.length : 0,
+                        firstChars: data.answer ? data.answer.substring(0, 50) + '...' : '',
+                        containsThinking: data.answer ? data.answer.includes('考え中...') : false
+                    }, null, 2);
+                    
+                } catch (error) {
+                    responseContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                    statusElement.textContent = 'Failed to get response.';
+                    debugInfo.textContent = `Error: ${error.message}\n${error.stack}`;
+                } finally {
+                    // Reset UI state
+                    submitBtn.disabled = false;
+                    testSelectorsBtn.disabled = false;
+                    loadingIndicator.style.display = 'none';
+                }
+            });
+            
+            // Test selectors only
+            testSelectorsBtn.addEventListener('click', async function() {
+                // Show loading state
+                testSelectorsBtn.disabled = true;
+                submitBtn.disabled = true;
+                loadingIndicator.style.display = 'inline-block';
+                statusElement.textContent = 'Testing selectors...';
+                
+                try {
+                    // Get the latest HTML from the server
+                    const response = await fetch('http://localhost:3000/ask', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ question: 'test selectors only' })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Test selectors on the HTML response
+                    if (data.html) {
+                        testSelectorsOnHtml(data.html);
+                        htmlResponse.textContent = data.html;
+                        htmlPreview.innerHTML = data.html;
+                        statusElement.textContent = 'Selector tests completed.';
+                        
+                        // Switch to the selectors tab
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tabContents.forEach(c => c.classList.remove('active'));
+                        document.querySelector('[data-tab="selectors-tab"]').classList.add('active');
+                        document.getElementById('selectors-tab').classList.add('active');
+                    } else {
+                        statusElement.textContent = 'No HTML response received for testing selectors.';
+                    }
+                } catch (error) {
+                    statusElement.textContent = `Error testing selectors: ${error.message}`;
+                    selectorResults.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                } finally {
+                    // Reset UI state
+                    testSelectorsBtn.disabled = false;
+                    submitBtn.disabled = false;
+                    loadingIndicator.style.display = 'none';
+                }
+            });
+            
+            // Test selectors on HTML
+            function testSelectorsOnHtml(html) {
+                // Create a temporary DOM element to parse the HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                
+                let resultsHtml = '';
+                
+                // Test each selector
+                responseSelectors.forEach(selector => {
+                    try {
+                        const element = tempDiv.querySelector(selector);
+                        
+                        if (element) {
+                            const text = element.textContent.trim();
+                            const isLongEnough = text.length > 50;
+                            
+                            if (isLongEnough) {
+                                resultsHtml += `<div class="selector-item selector-success">
+                                    <strong>✅ ${selector}</strong> - Found text (${text.length} chars):<br>
+                                    ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}
+                                </div>`;
+                            } else {
+                                resultsHtml += `<div class="selector-item selector-failure">
+                                    <strong>❌ ${selector}</strong> - Found element but text too short (${text.length} chars):<br>
+                                    ${text}
+                                </div>`;
+                            }
+                        } else {
+                            resultsHtml += `<div class="selector-item selector-failure">
+                                <strong>❌ ${selector}</strong> - No matching element found
+                            </div>`;
+                        }
+                    } catch (error) {
+                        resultsHtml += `<div class="selector-item selector-failure">
+                            <strong>❌ ${selector}</strong> - Error: ${error.message}
+                        </div>`;
+                    }
+                });
+                
+                selectorResults.innerHTML = resultsHtml;
+            }
+        });
+    </script>
+</body>
+</html>

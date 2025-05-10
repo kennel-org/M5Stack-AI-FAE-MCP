@@ -1,4 +1,6 @@
-# M5Stack AI FAE MCP
+# M5Stack AI FAE MCP (Under Development)
+
+**Note: This project is currently under development. Features and APIs may change without prior notice.**
 
 M5Stack AI FAE (Field Application Engineer) automation tool using Playwright. This project automates interactions with the M5 AI chat interface to retrieve technical information for M5Stack application development.
 
